@@ -1,0 +1,10 @@
+body {
+    background-color: #f8f9fa; /* A very light grey background */
+}
+
+/* Add some space between the login/register cards on smaller screens */
+@media (max-width: 767px) {
+    #auth-container .card {
+        margin-bottom: 1.5rem;
+    }
+}
