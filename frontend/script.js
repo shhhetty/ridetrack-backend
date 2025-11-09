@@ -40,8 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapElement = document.getElementById('map');
     const rideActions = document.getElementById('ride-actions');
 
-    const API_URL = 'https://ridetrack-backend.onrender.com';
-    const socket = io(API_URL);
+    const API_URL = '/api';
+    const socket = io();
 
     // --- SOCKET.IO EVENT LISTENERS ---
     socket.on('message', (data) => {
@@ -53,6 +53,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    socket.on('new_location', (data) => {
+        if (mapContainer.style.display === 'block') {
+            updateMapMarker(data.user, data.location);
+        }
     });
 
     // --- VIEW AND DATA FUNCTIONS ---
@@ -105,6 +111,63 @@ document.addEventListener('DOMContentLoaded', () => {
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(map);
+    }
+
+    let locationWatcherId = null;
+
+    function startSendingLocation(rideRoom) {
+        stopSendingLocation();
+        locationWatcherId = navigator.geolocation.watchPosition((position) => {
+            const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+            updateMapMarker(currentUser, coords);
+            socket.emit('location_update', {
+                room: rideRoom,
+                user: { id: currentUser.id, username: currentUser.username },
+                location: coords
+            });
+        }, (error) => {
+            console.error("Geolocation error:", error);
+            alert("Could not get location. Please ensure you have granted permission.");
+            stopSendingLocation();
+        }, { enableHighAccuracy: true });
+    }
+
+    function stopSendingLocation() {
+        if (locationWatcherId) {
+            navigator.geolocation.clearWatch(locationWatcherId);
+            locationWatcherId = null;
+        }
+    }
+
+    function updateMapMarker(user, location) {
+        if (!map) return;
+        const userId = user.id;
+        const username = user.username;
+        const coords = [location.lat, location.lng];
+        const isCurrentUser = currentUser && currentUser.id === userId;
+
+        const iconUrl = isCurrentUser ?
+            'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png' :
+            'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png';
+        
+        const customIcon = L.icon({
+            iconUrl: iconUrl,
+            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+            iconSize: [25, 41],
+            iconAnchor: [12, 41],
+            popupAnchor: [1, -34],
+            shadowSize: [41, 41]
+        });
+
+        if (userMarkers[userId]) {
+            userMarkers[userId].setLatLng(coords);
+        } else {
+            userMarkers[userId] = L.marker(coords, { icon: customIcon }).addTo(map).bindPopup(username);
+        }
+        
+        if (isCurrentUser) {
+            map.setView(coords, 15);
+        }
     }
 
     async function fetchProfile() {
@@ -411,6 +474,8 @@ document.addEventListener('DOMContentLoaded', () => {
         showView('groups-container');
     });
 
+    // In script.js
+
     groupsList.addEventListener('click', async (e) => {
         const token = localStorage.getItem('accessToken');
         if (!token) return;
@@ -418,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const groupId = target.dataset.groupId;
         if (!groupId) return;
 
+        // --- Logic for JOIN button ---
         if (target.classList.contains('join-button')) {
             try {
                 const response = await fetch(`${API_URL}/groups/${groupId}/join`, {
@@ -437,6 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // --- Logic for LEAVE button ---
         if (target.classList.contains('leave-button')) {
             try {
                 const response = await fetch(`${API_URL}/groups/${groupId}/leave`, {
@@ -456,11 +523,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // --- Logic for DETAILS button (This is the fully updated part) ---
         if (target.classList.contains('details-button')) {
             try {
                 const response = await fetch(`${API_URL}/groups/${groupId}`);
                 const groupDetails = await response.json();
 
+                // Populate the single group view with details and members
                 singleGroupName.textContent = groupDetails.name;
                 singleGroupDescription.textContent = groupDetails.description;
                 singleGroupMembers.innerHTML = '';
@@ -471,6 +540,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     singleGroupMembers.appendChild(li);
                 });
 
+                // Logic to create and show the correct ride button
                 rideActions.innerHTML = '';
                 const isCreator = currentUser.username === groupDetails.creator_username;
 
@@ -481,7 +551,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     joinRideButton.onclick = () => {
                         rideGroupName.textContent = `Ride: ${groupDetails.name}`;
                         showView('map-container');
+                        
                         initializeMap();
+
+                        // Force Leaflet to recalculate its size after the view is visible
+                        setTimeout(() => {
+                            if (map) {
+                                map.invalidateSize();
+                            }
+                        }, 10);
+
+                        const rideRoom = `ride_${groupDetails.active_ride_id}`;
+                        currentRoom = rideRoom;
+
+                        // Start sending location data
+                        startSendingLocation(rideRoom);
                     };
                     rideActions.appendChild(joinRideButton);
                 } else if (isCreator) {
@@ -496,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             });
                             if (startResponse.ok) {
                                 alert('Ride started! Refreshing group details.');
-                                target.click();
+                                target.click(); // Re-click the details button to refresh the view
                             } else {
                                 const errorData = await startResponse.json();
                                 alert(`Error: ${errorData.error}`);
@@ -508,11 +592,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     rideActions.appendChild(startRideButton);
                 }
 
+                // Join the chat room for this group
                 const room = `group_${groupId}`;
                 socket.emit('join', { username: currentUser.username, room: room });
                 currentRoom = room;
+                
+                // Switch to the single group view and clear old chat messages
                 showView('single-group-container');
                 chatMessages.innerHTML = '';
+
             } catch (error) {
                 console.error('Details Error:', error);
             }
