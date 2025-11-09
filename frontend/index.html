@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RideTrack</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">RideTrack</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul id="nav-links-logged-in" class="navbar-nav ms-auto" style="display: none;">
+                    <li class="nav-item"><a class="nav-link" href="#" id="profile-link">My Profile</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="groups-link">Groups</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="riders-link">Find Riders</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="connections-link">My Connections</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" id="navbar-logout-button">Logout</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <h1 class="mb-4">Welcome to RideTrack</h1>
+
+        <div id="auth-container">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="card-title">Register</h2>
+                            <form id="register-form">
+                                <div class="mb-3"><label for="reg-username" class="form-label">Username:</label><input type="text" id="reg-username" class="form-control" required></div>
+                                <div class="mb-3"><label for="reg-email" class="form-label">Email:</label><input type="email" id="reg-email" class="form-control" required></div>
+                                <div class="mb-3"><label for="reg-password" class="form-label">Password:</label><input type="password" id="reg-password" class="form-control" required></div>
+                                <button type="submit" class="btn btn-primary">Register</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-body">
+                            <h2 class="card-title">Login</h2>
+                            <form id="login-form">
+                                <div class="mb-3"><label for="login-email" class="form-label">Email:</label><input type="email" id="login-email" class="form-control" required></div>
+                                <div class="mb-3"><label for="login-password" class="form-label">Password:</label><input type="password" id="login-password" class="form-control" required></div>
+                                <button type="submit" class="btn btn-success">Login</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="profile-container" style="display: none;">
+            <h2>My Profile</h2>
+            <div class="card mb-4"><div class="card-body" id="profile-details"></div></div>
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title">Update Profile</h3>
+                    <form id="update-profile-form">
+                        <div class="row">
+                            <div class="col-md-6 mb-3"><label for="update-city" class="form-label">City:</label><input type="text" id="update-city" class="form-control"></div>
+                            <div class="col-md-6 mb-3"><label for="update-bike" class="form-label">Bike Model:</label><input type="text" id="update-bike" class="form-control"></div>
+                        </div>
+                        <div class="mb-3"><label for="update-bio" class="form-label">Bio:</label><textarea id="update-bio" class="form-control"></textarea></div>
+                        <button type="submit" class="btn btn-info">Update Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div id="groups-container" style="display: none;">
+            <hr class="my-4">
+            <h2>Riding Groups</h2>
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h3 class="card-title">Create a New Group</h3>
+                    <form id="create-group-form">
+                        <div class="mb-3"><label for="group-name" class="form-label">Group Name:</label><input type="text" id="group-name" class="form-control" required></div>
+                        <div class="mb-3"><label for="group-description" class="form-label">Description:</label><textarea id="group-description" class="form-control"></textarea></div>
+                        <button type="submit" class="btn btn-primary">Create Group</button>
+                    </form>
+                </div>
+            </div>
+            <h3>All Available Groups</h3>
+            <div id="groups-list" class="row"></div>
+        </div>
+
+        <div id="riders-container" style="display: none;">
+            <hr class="my-4">
+            <h2>Find Other Riders</h2>
+            <div id="riders-list" class="row"><p>Loading riders...</p></div>
+        </div>
+
+        <div id="connections-container" style="display: none;">
+            <hr class="my-4">
+            <h2>My Connections</h2>
+            <h4>Received Requests</h4>
+            <div id="received-requests-list" class="mb-4"></div>
+            <h4>Current Connections</h4>
+            <div id="current-connections-list" class="mb-4"></div>
+            <h4>Sent Requests (Pending)</h4>
+            <div id="sent-requests-list" class="mb-4"></div>
+        </div>
+
+        <div id="single-group-container" style="display: none;">
+            <button id="back-to-groups-button" class="btn btn-secondary mb-3">← Back to All Groups</button>
+            <h2 id="single-group-name"></h2>
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header">Group Chat</div>
+                        <div class="card-body" id="chat-messages" style="height: 400px; overflow-y: scroll;"></div>
+                        <div class="card-footer">
+                            <form id="chat-form">
+                                <div class="input-group">
+                                    <input type="text" id="chat-message-input" class="form-control" placeholder="Type a message..." required>
+                                    <button class="btn btn-primary" type="submit">Send</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <h4>About this Group</h4>
+                    <p id="single-group-description"></p>
+                    <div id="ride-actions" class="d-grid gap-2 mb-3"></div>
+                    <hr>
+                    <h4>Members</h4>
+                    <ul id="single-group-members" class="list-group"></ul>
+                </div>
+            </div>
+        </div>
+
+        <div id="map-container" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 id="ride-group-name"></h2>
+                <button id="leave-ride-button" class="btn btn-danger">End Ride & Go Back</button>
+            </div>
+            <div id="map" style="height: 600px; width: 100%;"></div>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
